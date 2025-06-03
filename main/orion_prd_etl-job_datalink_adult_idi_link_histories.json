@@ -1,0 +1,41 @@
+{
+  "name" : "orion_prd_etl-job_datalink_adult_idi_link_histories",
+  "jobMode" : "VISUAL",
+  "description" : "ONE-おでポ会員の大人用PASMOのIDiの紐づけ履歴",
+  "role" : "arn:aws:iam::142980225941:role/orion_prd_glue-role",
+  "executionProperty" : {
+    "maxConcurrentRuns" : 1
+  },
+  "command" : {
+    "name" : "glueetl",
+    "scriptLocation" : "s3://orion-prd-etljob/scripts/orion_prd_etl-job_datalink_adult_idi_link_histories.py",
+    "pythonVersion" : "3"
+  },
+  "defaultArguments" : {
+    "--enable-metrics" : "true",
+    "--spark-event-logs-path" : "s3://aws-glue-assets-142980225941-ap-northeast-1/sparkHistoryLogs/",
+    "--enable-job-insights" : "true",
+    "--enable-observability-metrics" : "true",
+    "--enable-glue-datacatalog" : "true",
+    "--SOURCE_SYSTEM" : "ONE",
+    "--job-bookmark-option" : "job-bookmark-disable",
+    "--DATA_NAME" : "adult_idi_link_histories",
+    "--job-language" : "python",
+    "--TempDir" : "s3://orion-prd-etljob/tmp/"
+  },
+  "maxRetries" : 0,
+  "allocatedCapacity" : 2,
+  "timeout" : 120,
+  "maxCapacity" : 2.0,
+  "glueVersion" : "4.0",
+  "numberOfWorkers" : 2,
+  "workerType" : "G.1X",
+  "executionClass" : "STANDARD",
+  "codeGenConfigurationNodes" : "{\"node-1728638294884\":{\"CustomCode\":{\"ClassName\":\"MyTransformOutputOneFileCsv\",\"Code\":\"from datetime import datetime\\nimport boto3\\nfrom awsglue.utils import getResolvedOptions\\nfrom pyspark.sql import DataFrame\\n\\n### 作成時の修正箇所ここから ###\\n#  本ノードは作成時のパラメータ設定不要です。このままお使いください。\\n### 作成時の修正箇所ここまで ###\\n\\nprint(f\\\"{datetime.strftime(datetime.now(), '%Y/%m/%dT%H:%M:%S')} INFO (MyTransformOutputOneFileCsv) start\\\")\\n\\n# Glueジョブ引数の取得\\nglue_params = getResolvedOptions(sys.argv, [\\\"SOURCE_SYSTEM\\\", \\\"DATA_NAME\\\"])\\nprint(f\\\"{datetime.strftime(datetime.now(), '%Y/%m/%dT%H:%M:%S')} DEBUG (MyTransformOutputOneFileCsv) glue_params:{glue_params}\\\")\\n\\n# 連携元システム名（DMP/ONE/OCTPASS）\\nsource_system = glue_params.get(\\\"SOURCE_SYSTEM\\\", None)\\n# データ名（物理テーブル名）\\ndata_name = glue_params.get(\\\"DATA_NAME\\\", None)\\n\\n# プレフィックスヘッド\\nprefix_head = f\\\"{source_system}/{data_name}\\\"\\n\\n# 作業用バケット\\nwork_bucket = \\\"orion-prd-work\\\"\\n# workディレクトリ\\nwork_dir = f\\\"{prefix_head}/dwh_work/\\\"\\n# 一時出力先s3パス\\nwork_s3_path = f\\\"s3://{work_bucket}/{work_dir}\\\"\\n\\n# DataFrameの取得\\ndf = dfc.select(list(dfc.keys())[0]).toDF()\\n\\n# workディレクトリにCSV形式で出力\\ndf.coalesce(1).write.options(encoding=\\\"UTF-8\\\", lineSep=\\\"\\\\n\\\", sep=\\\",\\\", quoteAll=True, header=True).mode(\\\"overwrite\\\").csv(work_s3_path)\\n\\n# 関数定義\\ndef get_process_timestamp_from_df(df: DataFrame, column_name: str) -> str:\\n    \\\"\\\"\\\"DFからデータ統合基盤処理日時 文字列を取得する\\n    Args:\\n        df (pysoar.sql.DataFrame): データフレーム\\n        column_name (str): データ統合基盤処理日時項目名\\n    Returns:\\n        str: yyyymmddhhmmss\\n    \\\"\\\"\\\"\\n    # JSTタイムスタンプカラムの値を取得（yyyy/mm/dd hh:mm:ss形式）\\n    orion_process_datetm = df.select(column_name).first()[0]\\n    # yyyymmddhhmmss形式に変換\\n    res_datetm_str = datetime.strptime(orion_process_datetm, \\\"%Y/%m/%d %H:%M:%S\\\").strftime(\\\"%Y%m%d%H%M%S\\\")\\n    return res_datetm_str\\n\\n# ■実行日時をJSTのyyyyymmddhhmmss文字列に変換\\n# DFの処理日時項目名\\nORION_PROCESS_DATETM = \\\"orion_process_datetm\\\"\\nexecute_timestamp_str = get_process_timestamp_from_df(df=df, column_name=ORION_PROCESS_DATETM)\\nprint(f\\\"{datetime.strftime(datetime.now(), '%Y/%m/%dT%H:%M:%S')} DEBUG (get_process_timestamp_from_df) execute_timestamp_str:{execute_timestamp_str}\\\")\\n\\n# DM_Bdashバケット\\ndm_bdash_bucket = \\\"orion-prd-dm-bdash\\\"\\n# 連携先ディレクトリ\\noutput_prefix = f\\\"{source_system}/{data_name}\\\"\\n# 連携ファイル名\\nfile_name = f\\\"{data_name}_{execute_timestamp_str}.csv\\\"\\n# 連携先key\\nfile_key = f\\\"{output_prefix}/{file_name}\\\"\\n\\n# S3クライアントを使用してworkフォルダに出力したファイルをリネームして移動\\ns3 = boto3.client(\\\"s3\\\")\\nresponse = s3.list_objects_v2(Bucket=work_bucket, Prefix=work_dir)\\nfor obj in response.get(\\\"Contents\\\", []):\\n    if obj[\\\"Key\\\"].endswith(\\\".csv\\\"):\\n        copy_source = {\\\"Bucket\\\": work_bucket, \\\"Key\\\": obj[\\\"Key\\\"]}\\n        print(f\\\"{datetime.strftime(datetime.now(), '%Y/%m/%dT%H:%M:%S')} DEBUG (MyTransformOutputOneFileCsv) copy_source:{copy_source}, dm_bdash_bucket:{dm_bdash_bucket}, file_key:{file_key}\\\")\\n        s3.copy_object(CopySource=copy_source, Bucket=dm_bdash_bucket, Key=file_key)\\n        s3.delete_object(Bucket=work_bucket, Key=obj[\\\"Key\\\"])\\n        break\\n\\nprint(f\\\"{datetime.strftime(datetime.now(), '%Y/%m/%dT%H:%M:%S')} INFO (MyTransformOutputOneFileCsv) end\\\")\\n\\n\",\"Inputs\":[\"node-1732539572610\"],\"Name\":\"【必須】１ファイルでb→dash向けDMバケットへ出力\"}},\"node-1727682543308\":{\"S3ParquetSource\":{\"AdditionalOptions\":{\"EnableSamplePath\":false,\"SamplePath\":\"s3://orion-prd-work/ONE/adult_idi_link_histories/dwh_tmp/adult_idi_link_histories_dwh_20250603020049.snappy.parquet\"},\"Exclusions\":[],\"Name\":\"【必須】連携された正則化済データ\",\"OutputSchemas\":[{\"Columns\":[{\"Name\":\"id\",\"Type\":\"int\"},{\"Name\":\"uid\",\"Type\":\"string\"},{\"Name\":\"idi\",\"Type\":\"string\"},{\"Name\":\"start_dt\",\"Type\":\"string\"},{\"Name\":\"end_dt\",\"Type\":\"string\"},{\"Name\":\"create_pgm_cd\",\"Type\":\"string\"},{\"Name\":\"create_user_id\",\"Type\":\"string\"},{\"Name\":\"create_dt\",\"Type\":\"string\"},{\"Name\":\"update_pgm_cd\",\"Type\":\"string\"},{\"Name\":\"update_user_id\",\"Type\":\"string\"},{\"Name\":\"update_dt\",\"Type\":\"string\"},{\"Name\":\"patch_cd\",\"Type\":\"string\"},{\"Name\":\"patch_user_id\",\"Type\":\"string\"},{\"Name\":\"patch_dt\",\"Type\":\"string\"},{\"Name\":\"orion_process_datetm\",\"Type\":\"string\"}]}],\"Paths\":[\"s3://orion-prd-work/ONE/adult_idi_link_histories/dwh_tmp/\"]}},\"node-1732539572610\":{\"DropFields\":{\"Inputs\":[\"node-1727682543308\"],\"Name\":\"【加工】非連携項目の削除\",\"Paths\":[[\"create_pgm_cd\"],[\"create_user_id\"],[\"update_pgm_cd\"],[\"update_user_id\"],[\"patch_cd\"],[\"patch_user_id\"]]}}}",
+  "sourceControlDetails" : {
+    "provider" : "GITHUB",
+    "repository" : "ORioN_nonPIA",
+    "branch" : "master",
+    "folder" : "main"
+  }
+}
