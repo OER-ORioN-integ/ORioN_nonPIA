@@ -1,0 +1,42 @@
+{
+  "name" : "orion_prd_etl-job_data_separating",
+  "jobMode" : "SCRIPT",
+  "description" : "【ORioN】データ分割",
+  "role" : "arn:aws:iam::142980225941:role/orion_prd_glue-role",
+  "executionProperty" : {
+    "maxConcurrentRuns" : 10
+  },
+  "command" : {
+    "name" : "glueetl",
+    "scriptLocation" : "s3://orion-prd-etljob/scripts/orion_prd_etl-job_data_separating.py",
+    "pythonVersion" : "3"
+  },
+  "defaultArguments" : {
+    "--INPUT_FILE_PATH" : "s3://orion-prd-dm-bdash/DMP/past_raw_memadm_point_use/past_raw_memadm_point_use_20240901090000.csv",
+    "--enable-metrics" : "true",
+    "--spark-event-logs-path" : "s3://orion-prd-etljob/sparkHistoryLogs/",
+    "--enable-job-insights" : "true",
+    "--OUTPUT_DIR_PREFIX" : "DMP/past_raw_memadm_point_use/separate",
+    "--enable-observability-metrics" : "true",
+    "--enable-glue-datacatalog" : "true",
+    "--OUTPUT_BUCKET_NAME" : "orion-prd-dm-bdash",
+    "--job-bookmark-option" : "job-bookmark-disable",
+    "--job-language" : "python",
+    "--TempDir" : "s3://orion-prd-etljob/tmp/",
+    "--OUTPUT_DATA_NAME" : "raw_memadm_point_use"
+  },
+  "maxRetries" : 0,
+  "allocatedCapacity" : 2,
+  "timeout" : 120,
+  "maxCapacity" : 2.0,
+  "glueVersion" : "4.0",
+  "numberOfWorkers" : 2,
+  "workerType" : "G.1X",
+  "executionClass" : "STANDARD",
+  "sourceControlDetails" : {
+    "provider" : "GITHUB",
+    "repository" : "ORioN_nonPIA",
+    "branch" : "master",
+    "folder" : "main"
+  }
+}
