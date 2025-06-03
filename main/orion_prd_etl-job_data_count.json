@@ -1,0 +1,42 @@
+{
+  "name" : "orion_prd_etl-job_data_count",
+  "jobMode" : "SCRIPT",
+  "description" : "【ORioN】レコードカウント",
+  "role" : "arn:aws:iam::142980225941:role/orion_prd_glue-role",
+  "executionProperty" : {
+    "maxConcurrentRuns" : 10
+  },
+  "command" : {
+    "name" : "glueetl",
+    "scriptLocation" : "s3://orion-prd-etljob/scripts/orion_prd_etl-job_data_count.py",
+    "pythonVersion" : "3"
+  },
+  "defaultArguments" : {
+    "--enable-metrics" : "true",
+    "--spark-event-logs-path" : "s3://orion-prd-etljob/sparkHistoryLogs/",
+    "--OUTPUT_S3_DIR" : "s3://orion-prd-dm-bdash/DMP/past_raw_memadm_point_use/count/past_sep/",
+    "--enable-job-insights" : "true",
+    "--INPUT_S3_DIR" : "s3://orion-prd-dm-bdash/DMP/past_raw_memadm_point_use/separate/",
+    "--enable-observability-metrics" : "true",
+    "--enable-glue-datacatalog" : "true",
+    "--GROUP_BY_COLUMNS" : "work_dt",
+    "--job-bookmark-option" : "job-bookmark-disable",
+    "--ORDER_BY_COLUMNS" : "work_dt",
+    "--job-language" : "python",
+    "--TempDir" : "s3://orion-prd-etljob/tmp/"
+  },
+  "maxRetries" : 0,
+  "allocatedCapacity" : 2,
+  "timeout" : 120,
+  "maxCapacity" : 2.0,
+  "glueVersion" : "4.0",
+  "numberOfWorkers" : 2,
+  "workerType" : "G.1X",
+  "executionClass" : "STANDARD",
+  "sourceControlDetails" : {
+    "provider" : "GITHUB",
+    "repository" : "ORioN_nonPIA",
+    "branch" : "master",
+    "folder" : "main"
+  }
+}
